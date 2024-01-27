@@ -181,6 +181,11 @@ async function checkBalance() {
 
 async function sendToFaucet() {
   const walletData = JSON.parse(fs.readFileSync("wallet.json", "utf-8"));
+  if (walletData.addressType.toUpperCase() !== "P2PKH") {
+    console.error("Wallet address type must be P2PKH");
+    return;
+  }
+
   console.info("\nGetting Wallet Info and Balance");
   await getAddressInfo(walletData.address);
 
