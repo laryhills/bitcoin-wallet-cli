@@ -20,6 +20,9 @@ const API_URL =
     ? "https://api.blockchair.com/bitcoin/testnet"
     : "https://api.blockchair.com/bitcoin";
 
+// Set your desired fee rate (in satoshis per byte)
+const feeRate = 20;
+
 let walletBalance = null;
 let utxos = [];
 
@@ -213,13 +216,6 @@ async function sendToFaucet() {
 
   const amount = parseFloat(faucetInputs.amount);
   const faucetAddress = faucetInputs.faucetAddress.trim();
-  const minerFee = 10000;
-
-  // check if balance is sufficient
-  if (walletBalance < amount * 100000000 + minerFee) {
-    console.error("Insufficient balance");
-    return;
-  }
 
   console.info("\nPreparing transaction...");
 
@@ -245,6 +241,21 @@ async function sendToFaucet() {
     totalInputValue += utxo.value;
   }
 
+  console.log("Calculating fee...");
+  // Estimate the transaction size in bytes
+  let estimatedSize =
+    psbt.data.inputs.length * 180 + psbt.data.outputs.length * 34 + 10;
+
+  // Calculate the miner's fee
+  let minerFee = estimatedSize * feeRate;
+  console.log("Fee:", minerFee, "satoshis");
+
+  // check if balance is sufficient
+  if (walletBalance < amount * 100000000 + minerFee) {
+    console.error("Insufficient balance");
+    return;
+  }
+
   const amountToSpend = amount * 100000000 - minerFee;
 
   if (amountToSpend === 0) {
@@ -263,7 +274,7 @@ async function sendToFaucet() {
   }); // make amount in satoshis
 
   // Calculate the remaining balance after sending the amount and paying the fee
-  const remainingBalance = totalInputValue - amountToSpend;
+  const remainingBalance = totalInputValue - (amountToSpend + minerFee);
 
   // Add another output that sends the remaining balance back to the original wallet
   if (remainingBalance > 0) {
@@ -332,9 +343,15 @@ async function getAddressInfo(address) {
 
 // Fetch the raw transaction data
 async function getRawTransaction(txid) {
-  const response = await axios.get(`${API_URL}/raw/transaction/${txid}`);
-  const rawTransaction = response.data.data[txid].raw_transaction;
-  return Buffer.from(rawTransaction, "hex");
+  try {
+    const response = await axios.get(`${API_URL}/raw/transaction/${txid}`);
+    const rawTransaction = response.data.data[txid].raw_transaction;
+    return Buffer.from(rawTransaction, "hex");
+  } catch (error) {
+    throw new Error(
+      `Error retrieving raw transaction ${txid}: ${error.message}`
+    );
+  }
 }
 
 function toXOnly(pubkey) {
