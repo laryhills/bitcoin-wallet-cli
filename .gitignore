@@ -1,3 +1,6 @@
+# Wallets
+*.json
+
 # Logs
 logs
 *.log
